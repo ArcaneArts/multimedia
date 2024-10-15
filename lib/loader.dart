@@ -31,6 +31,9 @@ class ImageGoal {
 }
 
 class MediaMagic {
+  static (int, int) forceScaleImage(int w, int h, int maxDim) =>
+      w > h ? (maxDim, (maxDim * h) ~/ w) : ((maxDim * w) ~/ h, maxDim);
+
   static (int, int) imageScale(int w, int h, int maxDim) => max(w, h) <= maxDim
       ? (w, h)
       : w > h
@@ -58,11 +61,24 @@ class MediaMagic {
     return s;
   }
 
-  static Future<void> findOptimal(
+  static Future<String> findOptimal(
     File input,
     List<ImageGoal> goals, {
-    int maxAttempts = 4,
+    int maxAttempts = 10,
   }) async {
+    Future<String> snipeThumbhash(MagickWand wand) async {
+      (int, int) imgs =
+          (wand.magickGetImageWidth(), wand.magickGetImageHeight());
+      (int, int) outSize = forceScaleImage(imgs.$1, imgs.$2, 100);
+      await wand.magickScaleImage(columns: outSize.$1, rows: outSize.$2);
+      File t = File("${input.path.split(Platform.pathSeparator).last}.rgba");
+      await wand.magickWriteImage(t.path);
+      String s = base64.encode(
+          rgbaToThumbHash(outSize.$1, outSize.$2, await t.readAsBytes()));
+      await t.delete();
+      return s;
+    }
+
     goals.sort((a, b) => b.maxDimension.compareTo(a.maxDimension));
     MagickWand wand = MagickWand.newMagickWand();
     await wand.magickReadImage(input.path);
@@ -70,8 +86,20 @@ class MediaMagic {
         PixelInterpolateMethod.BilinearInterpolatePixel);
     (int, int) inSize =
         (wand.magickGetImageWidth(), wand.magickGetImageHeight());
+    String? th;
+
+    if (goals.first.maxDimension <= 100 || min(inSize.$1, inSize.$2) <= 100) {
+      th = await snipeThumbhash(wand);
+      inSize = (wand.magickGetImageWidth(), wand.magickGetImageHeight());
+    }
 
     for (ImageGoal goal in goals) {
+      if (th == null && goal.maxDimension <= 100 ||
+          min(inSize.$1, inSize.$2) <= 100) {
+        th = await snipeThumbhash(wand);
+        inSize = (wand.magickGetImageWidth(), wand.magickGetImageHeight());
+      }
+
       (int, int) outSize = imageScale(inSize.$1, inSize.$2, goal.maxDimension);
       await wand.magickScaleImage(columns: outSize.$1, rows: outSize.$2);
       inSize = outSize;
@@ -111,6 +139,14 @@ class MediaMagic {
       print(
           "Optimal Compression for ${goal.file.path} is $comp% (${((goal.file.lengthSync() / goal.maxBytes * 100)).toStringAsFixed(2)}% of target ${goal.maxBytes.readableFileSize()})");
     }
+
+    if (th == null) {
+      th = await snipeThumbhash(wand);
+      inSize = (wand.magickGetImageWidth(), wand.magickGetImageHeight());
+    }
+
+    await wand.destroyMagickWand();
+    return th;
   }
 
   static Future<void> processImages(File input, List<ImageDestination> d,
@@ -139,19 +175,6 @@ class MediaMagic {
 
     await wand.destroyMagickWand();
   }
-}
-
-void main() async {
-  initMultimedia();
-  File f = File("in.png").absolute;
-
-  await MediaMagic.findOptimal(
-      f,
-      [
-        ImageGoal(File("thumb.webp"), 336, 1024 * 1),
-        ImageGoal(File("out.webp"), 4096, 1024 * 1024 * 2),
-      ],
-      maxAttempts: 10);
 }
 
 void initMultimedia() {

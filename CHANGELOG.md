@@ -1,3 +1,15 @@
+## 1.0.3
+
+* Pipeline
+
+## 1.0.2
+
+* Fixes
+
+## 1.0.1
+
+* Fixes
+
 ## 1.0.0
 
-- Initial version.
+* Initial release
