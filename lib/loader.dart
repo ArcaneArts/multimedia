@@ -211,9 +211,10 @@ DynamicLibrary _load(String libName) {
     return DynamicLibrary.open('$libName.framework/$libName');
   }
   if (Platform.isAndroid || Platform.isLinux) {
-    _install('lib$libName.so');
+    _install('${Directory.current.absolute.path}/lib$libName.so');
     print("Loading Library lib$libName.so");
-    return DynamicLibrary.open('lib$libName.so');
+    return DynamicLibrary.open(
+        '${Directory.current.absolute.path}/lib$libName.so');
   }
   if (Platform.isWindows) {
     _install('$libName.dll');
