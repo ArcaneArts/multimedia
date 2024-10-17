@@ -78,8 +78,9 @@ class MediaPipelineJob extends IPipelineJob {
 class MagickImageLoaderJob extends IPipelineJob {
   final File image;
   final String wandKey;
+  final int? maxDim;
 
-  MagickImageLoaderJob(this.image, {this.wandKey = "wand"});
+  MagickImageLoaderJob(this.image, {this.wandKey = "wand", this.maxDim});
 
   @override
   int get priority => _pmax;
@@ -88,6 +89,14 @@ class MagickImageLoaderJob extends IPipelineJob {
   Future<void> transform(MediaPipeline pipeline) async {
     MagickWand wand = MagickWand.newMagickWand();
     await wand.magickReadImage(image.path);
+
+    if (maxDim != null) {
+      (int, int) inSize =
+          (wand.magickGetImageWidth(), wand.magickGetImageHeight());
+      (int, int) outSize = _imageScale(inSize.$1, inSize.$2, maxDim!);
+      await wand.magickScaleImage(columns: outSize.$1, rows: outSize.$2);
+    }
+
     pipeline.memory["$wandKey.src"] = image;
     pipeline.memory[wandKey] = wand;
   }

@@ -1,3 +1,7 @@
+## 1.0.6
+
+* Allow the loader pipeline job to auto scale down right after loading to prevent lots of memory usage for long pipelines.
+
 ## 1.0.5
 
 * Dart Support
