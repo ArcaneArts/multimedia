@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
-import 'package:image_magick_ffi/image_magick_ffi.dart';
+import 'package:multimedia/multimedia.dart';
 import 'package:precision_stopwatch/precision_stopwatch.dart';
 import 'package:thumbhash/thumbhash.dart';
 import 'package:toxic/extensions/double.dart';
@@ -251,6 +251,7 @@ class MediaPipeline extends MediaPipelineJob {
   MediaPipeline(super.jobs);
 
   Future<void> push() async {
+    initMultimedia();
     memory["completed"] = 0;
     memory["ind"] = 0;
     memory["total"] = count;

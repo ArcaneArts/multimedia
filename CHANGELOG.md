@@ -1,3 +1,7 @@
+## 1.0.5
+
+* Dart Support
+
 ## 1.0.4
 
 * Now with linux
