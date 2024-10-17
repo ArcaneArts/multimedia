@@ -1,3 +1,7 @@
+## 1.0.4
+
+* Now with linux
+
 ## 1.0.3
 
 * Pipeline
