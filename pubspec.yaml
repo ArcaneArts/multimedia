@@ -1,6 +1,6 @@
 name: multimedia
 description: Multimedia libraries for pure dart with native bindings
-version: 1.0.6
+version: 1.0.7
 repository: https://github.com/ArcaneArts/multimedia
 environment:
   sdk: ^3.5.2

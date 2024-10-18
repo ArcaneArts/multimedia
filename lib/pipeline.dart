@@ -10,9 +10,17 @@ import 'package:toxic/extensions/num.dart';
 
 int _pmax = -1 >>> 1;
 
+void main() async => ImageConversionJob.jpg(
+        input: File("something.png"),
+        output: File("something.jpg"),
+        quality: 100)
+    .blind();
+
 abstract class IPipelineJob {
   /// Higher priority jobs run first before lower priority jobs.
   int get priority;
+
+  Future<void> blind() => transform(MediaPipeline([]));
 
   Future<void> transform(MediaPipeline pipeline);
 
@@ -21,6 +29,55 @@ abstract class IPipelineJob {
       );
 
   int get count => 1;
+}
+
+class ImageConversionJob extends IPipelineJob {
+  final File input;
+  final File output;
+  final String format;
+  final int quality;
+  final CompressionType compressionType;
+
+  ImageConversionJob({
+    required this.input,
+    required this.output,
+    this.format = "webp",
+    this.compressionType = CompressionType.WebPCompression,
+    this.quality = 100,
+  });
+
+  ImageConversionJob.webp(
+      {required this.input, required this.output, this.quality = 100})
+      : format = "webp",
+        compressionType = CompressionType.WebPCompression;
+
+  ImageConversionJob.jpg({
+    required this.input,
+    required this.output,
+    this.quality = 100,
+  })  : format = "jpg",
+        compressionType = CompressionType.JPEGCompression;
+
+  ImageConversionJob.png({
+    required this.input,
+    required this.output,
+  })  : quality = 100,
+        format = "png",
+        compressionType = CompressionType.NoCompression;
+
+  @override
+  int get priority => 0;
+
+  @override
+  Future<void> transform(MediaPipeline pipeline) async {
+    MagickWand w = MagickWand.newMagickWand();
+    w.magickReadImage(input.path);
+    w.magickSetImageCompression(compressionType);
+    w.magickSetImageCompressionQuality(quality);
+    w.magickSetImageFormat(format);
+    await w.magickWriteImage(output.path);
+    await w.destroyMagickWand();
+  }
 }
 
 /// A job that runs a single transformation using a shared MagickWand.
@@ -131,16 +188,68 @@ class ImageThumbHashJob extends MagickPipelineJob {
   }
 }
 
-class ImageScaleWebPJob extends MagickPipelineJob {
+class ImageWriteJob extends MagickPipelineJob {
+  final File output;
+  final CompressionType compressionType;
+  final String format;
+  final int quality;
+
+  @override
+  final int priority;
+
+  ImageWriteJob(
+      {super.wandKey = "wand",
+      required this.output,
+      this.priority = 0,
+      this.compressionType = CompressionType.WebPCompression,
+      this.format = "webp",
+      this.quality = 100});
+
+  ImageWriteJob.webp(
+      {super.wandKey = "wand",
+      required this.output,
+      this.priority = 0,
+      this.quality = 100})
+      : compressionType = CompressionType.WebPCompression,
+        format = "webp";
+
+  ImageWriteJob.jpg(
+      {super.wandKey = "wand",
+      required this.output,
+      this.priority = 0,
+      this.quality = 100})
+      : compressionType = CompressionType.JPEGCompression,
+        format = "jpg";
+
+  ImageWriteJob.png(
+      {super.wandKey = "wand", required this.output, this.priority = 0})
+      : compressionType = CompressionType.NoCompression,
+        format = "png",
+        quality = 100;
+
+  @override
+  Future<void> wandTransform(MediaPipeline pipeline, MagickWand wand) {
+    wand.magickSetImageCompression(compressionType);
+    wand.magickSetImageCompressionQuality(quality);
+    wand.magickSetImageFormat(format);
+    return wand.magickWriteImage(output.path);
+  }
+}
+
+class ImageScaleJob extends MagickPipelineJob {
   final int maxDimension;
   final int quality;
   final PixelInterpolateMethod interpolateMethod;
   final File output;
+  final String format;
+  final CompressionType compressionType;
 
-  ImageScaleWebPJob({
+  ImageScaleJob({
     super.wandKey = "wand",
     this.maxDimension = 1024,
     this.quality = 100,
+    this.format = "webp",
+    this.compressionType = CompressionType.WebPCompression,
     this.interpolateMethod = PixelInterpolateMethod.BilinearInterpolatePixel,
     required this.output,
   });
@@ -155,9 +264,9 @@ class ImageScaleWebPJob extends MagickPipelineJob {
     (int, int) outSize = _imageScale(inSize.$1, inSize.$2, maxDimension);
     wand.magickSetInterpolateMethod(interpolateMethod);
     wand.magickSetImageInterpolateMethod(interpolateMethod);
-    wand.magickSetImageCompression(CompressionType.WebPCompression);
-    wand.magickSetImageFormat("webp");
+    wand.magickSetImageCompression(compressionType);
     wand.magickSetImageCompressionQuality(quality);
+    wand.magickSetImageFormat(format);
     return wand.magickScaleImage(columns: outSize.$1, rows: outSize.$2);
   }
 }
@@ -260,13 +369,22 @@ class MediaPipeline extends MediaPipelineJob {
   MediaPipeline(super.jobs);
 
   Future<void> push() async {
-    initMultimedia();
-    memory["completed"] = 0;
-    memory["ind"] = 0;
-    memory["total"] = count;
-    PrecisionStopwatch psw = PrecisionStopwatch.start();
-    print("Starting pipeline with ${memory["total"]} jobs");
-    await transform(this);
-    print("Pipeline completed in ${psw.getMilliseconds()}ms");
+    try {
+      initMultimedia();
+      memory["completed"] = 0;
+      memory["ind"] = 0;
+      memory["total"] = count;
+      PrecisionStopwatch psw = PrecisionStopwatch.start();
+      print("Starting pipeline with ${memory["total"]} jobs");
+      await transform(this);
+      print("Pipeline completed in ${psw.getMilliseconds()}ms");
+    } catch (e, es) {
+      print("Pipeline failed: $e");
+      print(es);
+    } finally {
+      await Future.wait(memory.values
+          .whereType<MagickWand>()
+          .map((w) => w.destroyMagickWand()));
+    }
   }
 }
