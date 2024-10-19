@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:image/image.dart' as img;
 import 'package:multimedia/multimedia.dart';
 import 'package:precision_stopwatch/precision_stopwatch.dart';
 import 'package:thumbhash/thumbhash.dart';
@@ -9,12 +10,6 @@ import 'package:toxic/extensions/double.dart';
 import 'package:toxic/extensions/num.dart';
 
 int _pmax = -1 >>> 1;
-
-void main() async => ImageConversionJob.jpg(
-        input: File("something.png"),
-        output: File("something.jpg"),
-        quality: 100)
-    .blind();
 
 abstract class IPipelineJob {
   /// Higher priority jobs run first before lower priority jobs.
@@ -70,6 +65,8 @@ class ImageConversionJob extends IPipelineJob {
 
   @override
   Future<void> transform(MediaPipeline pipeline) async {
+    if (!multimediaFFIMode) {}
+
     MagickWand w = MagickWand.newMagickWand();
     w.magickReadImage(input.path);
     w.magickSetImageCompression(compressionType);
@@ -136,14 +133,32 @@ class MagickImageLoaderJob extends IPipelineJob {
   final File image;
   final String wandKey;
   final int? maxDim;
+  final String? formatHint;
 
-  MagickImageLoaderJob(this.image, {this.wandKey = "wand", this.maxDim});
+  MagickImageLoaderJob(this.image,
+      {this.wandKey = "wand", this.maxDim, this.formatHint});
 
   @override
   int get priority => _pmax;
 
   @override
   Future<void> transform(MediaPipeline pipeline) async {
+    if (!multimediaFFIMode) {
+      pipeline.memory["$wandKey.src"] = image;
+      return;
+    }
+
+    if (formatHint != null &&
+        !isFormatReadSupportedMagick(formatHint!) &&
+        isFormatReadSupportedBackup(formatHint!)) {
+      print("Using backup loader for $formatHint to convert to PNG first");
+      await (img.Command()
+            ..decodeImageFile(image.path)
+            ..encodePng(level: 0)
+            ..writeToFile(image.path))
+          .executeThread();
+    }
+
     MagickWand wand = MagickWand.newMagickWand();
     await wand.magickReadImage(image.path);
 
@@ -370,7 +385,7 @@ class MediaPipeline extends MediaPipelineJob {
 
   Future<void> push() async {
     try {
-      initMultimedia();
+      await initMultimedia();
       memory["completed"] = 0;
       memory["ind"] = 0;
       memory["total"] = count;

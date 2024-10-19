@@ -1,3 +1,11 @@
+## 1.0.9
+
+* Dynamically uses image package to decode image formats which the current imagemagick install cant read by converting to png first.
+
+## 1.0.8
+
+* Fix Lib loading on linux
+
 ## 1.0.7
 
 * Memory cleanup and some additions
