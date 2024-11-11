@@ -1,3 +1,6 @@
+## 1.0.13
+* Optional Conversion Tests
+
 ## 1.0.12
 * Allow an override library to be supplied
 

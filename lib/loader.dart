@@ -148,7 +148,10 @@ class ImageFormatSupport {
 }
 
 Future<void> initMultimedia(
-    {bool ffi = true, bool initMagick = true, File? overrideLibrary}) async {
+    {bool ffi = true,
+    bool initMagick = true,
+    bool testConversion = false,
+    File? overrideLibrary}) async {
   if (_initialized) {
     return;
   }
@@ -167,7 +170,9 @@ Future<void> initMultimedia(
       initializeImageMagick();
     }
 
-    await _testSupportedFormats();
+    if (testConversion) {
+      await _testSupportedFormats();
+    }
   } catch (e, es) {
     print("Failed to initialize ImageMagick: $e");
     print(es);
