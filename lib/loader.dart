@@ -147,7 +147,7 @@ class ImageFormatSupport {
   ImageFormatSupport(this.format, this.read, this.write);
 }
 
-Future<void> initMultimedia({bool ffi = true}) async {
+Future<void> initMultimedia({bool ffi = true, bool initMagick = true}) async {
   if (_initialized) {
     return;
   }
@@ -161,10 +161,15 @@ Future<void> initMultimedia({bool ffi = true}) async {
 
   try {
     _load("image_magick_ffi");
-    initializeImageMagick();
+
+    if (initMagick) {
+      initializeImageMagick();
+    }
+
     await _testSupportedFormats();
-  } catch (e) {
+  } catch (e, es) {
     print("Failed to initialize ImageMagick: $e");
+    print(es);
   }
 }
 

@@ -1,3 +1,9 @@
+## 1.0.11
+* Show stack on fails
+
+## 1.0.10
+* Allow magick to not be initialized for flutter contexts
+
 ## 1.0.9
 
 * Dynamically uses image package to decode image formats which the current imagemagick install cant read by converting to png first.
