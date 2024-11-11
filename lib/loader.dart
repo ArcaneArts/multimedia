@@ -147,7 +147,8 @@ class ImageFormatSupport {
   ImageFormatSupport(this.format, this.read, this.write);
 }
 
-Future<void> initMultimedia({bool ffi = true, bool initMagick = true}) async {
+Future<void> initMultimedia(
+    {bool ffi = true, bool initMagick = true, File? overrideLibrary}) async {
   if (_initialized) {
     return;
   }
@@ -160,7 +161,7 @@ Future<void> initMultimedia({bool ffi = true, bool initMagick = true}) async {
   }
 
   try {
-    _load("image_magick_ffi");
+    _load("image_magick_ffi", overrideLibrary);
 
     if (initMagick) {
       initializeImageMagick();
@@ -173,14 +174,13 @@ Future<void> initMultimedia({bool ffi = true, bool initMagick = true}) async {
   }
 }
 
-void _install(String n) {
+void _install(String n, [File? o]) {
   File f = File(n);
   if (f.existsSync()) {
     return;
   }
 
-  File o =
-      File.fromUri(Isolate.resolvePackageUriSync(Uri.parse("$_prefix/$n"))!);
+  o ??= File.fromUri(Isolate.resolvePackageUriSync(Uri.parse("$_prefix/$n"))!);
   print(o.path);
 
   if (!o.existsSync()) {
@@ -191,14 +191,14 @@ void _install(String n) {
   f.writeAsBytesSync(o.readAsBytesSync());
 }
 
-DynamicLibrary _load(String libName) {
+DynamicLibrary _load(String libName, [File? o]) {
   if (Platform.isMacOS || Platform.isIOS) {
-    _install('$libName.framework/$libName');
+    _install('$libName.framework/$libName', o);
     print("Loading Library $libName.framework/$libName");
     return DynamicLibrary.open('$libName.framework/$libName');
   }
   if (Platform.isAndroid || Platform.isLinux) {
-    _install('lib$libName.so');
+    _install('lib$libName.so', o);
     print("Loading Library lib$libName.so");
     return _loadAny([
       '${Directory.current.absolute.path}/lib$libName.so',
@@ -208,7 +208,7 @@ DynamicLibrary _load(String libName) {
     ]);
   }
   if (Platform.isWindows) {
-    _install('$libName.dll');
+    _install('$libName.dll', o);
     print("Loading Library $libName.dll");
     return DynamicLibrary.open('$libName.dll');
   }
